@@ -1,0 +1,140 @@
+' VARIABLE TO KEEP TRACK OF MAXIMUM ROW NUMBER FOR EACH SHEET
+Dim maximumRowNumber As Long
+
+' CONSTANTS FOR COLOR CODING
+Const colorRed As Integer = 3
+Const colorGreen As Integer = 4
+
+Sub ProcessAllSheets()
+    Dim worksheetCount As Integer
+    worksheetCount = ActiveWorkbook.Worksheets.Count
+    
+    ' VARIABLES FOR WORKSHEET PROCESSING
+    Dim worksheetName As String
+    Dim currentWorksheet As Worksheet
+    
+    Dim index As Integer
+    For index = 1 To worksheetCount
+        ' ASSIGN CURRENT WORKSHEET OBJECT
+        Set currentWorksheet = ActiveWorkbook.Worksheets(index)
+        
+        ' RETRIEVE WORKSHEET NAME AND FINAL ROW NUMBER
+        worksheetName = currentWorksheet.Name
+        maximumRowNumber = currentWorksheet.Cells(Rows.Count, 1).End(xlUp).Row
+        
+        ' CALL SUBROUTINE TO PROCESS STOCKS ON CURRENT WORKSHEET
+        ProcessStockData currentWorksheet
+    Next index
+End Sub
+
+Sub ProcessStockData(currentWorksheet As Worksheet)
+    Dim rowIndex, outputRowIndex As Long
+    Dim dailyVolume, totalVolume, openingPrice, closingPrice As Double
+    Dim yearlyOpeningPrice, yearlyClosingPrice, yearlyPriceChange, yearlyPercentChange As Double
+    Dim currentStockTicker, nextStockTicker As String
+    
+    ' VARIABLES TO TRACK MAXIMUM YEARLY CHANGES AND VOLUMES
+    Dim tickerWithMaximumIncrease, tickerWithMaximumDecrease, tickerWithMaximumVolume As String
+    Dim maximumYearlyIncrease, maximumYearlyDecrease, maximumTotalVolume As Double
+    maximumYearlyIncrease = 0
+    maximumYearlyDecrease = 0
+    maximumTotalVolume = 0
+    
+    ' INITIALIZE VARIABLES
+    yearlyOpeningPrice = -1
+    totalVolume = 0
+    
+    ' VARIABLE TO TRACK OUTPUT ROW INDEX
+    outputRowIndex = 2
+    
+    ' SET HEADERS FOR THE SUMMARY TABLE
+    currentWorksheet.Range("I1").Value = "Ticker"
+    currentWorksheet.Range("J1").Value = "Yearly Change"
+    currentWorksheet.Range("K1").Value = "Percentage Change"
+    currentWorksheet.Range("L1").Value = "Total Stock Volume"
+    currentWorksheet.Range("I1:L1").Font.Bold = True
+    
+    For rowIndex = 2 To maximumRowNumber
+        currentStockTicker = currentWorksheet.Cells(rowIndex, 1).Value
+        nextStockTicker = currentWorksheet.Cells(rowIndex + 1, 1).Value
+        openingPrice = currentWorksheet.Cells(rowIndex, 3).Value
+        closingPrice = currentWorksheet.Cells(rowIndex, 6).Value
+        dailyVolume = currentWorksheet.Cells(rowIndex, 7).Value
+        
+        totalVolume = totalVolume + dailyVolume
+        
+        If yearlyOpeningPrice = -1 Then
+            yearlyOpeningPrice = openingPrice
+        End If
+        
+        If nextStockTicker <> currentStockTicker Then
+            ' CALCULATE YEARLY PRICE CHANGE AND PERCENTAGE CHANGE
+            yearlyClosingPrice = closingPrice
+            yearlyPriceChange = yearlyClosingPrice - yearlyOpeningPrice
+            
+            If yearlyOpeningPrice <> 0 Then
+            yearlyPercentChange = yearlyPriceChange / yearlyOpeningPrice
+            Else
+                yearlyPercentChange = 0
+            End If
+            
+            ' UPDATE MAXIMUM VALUES FOR YEARLY CHANGES
+            If yearlyPercentChange > maximumYearlyIncrease Then
+                maximumYearlyIncrease = yearlyPercentChange
+                tickerWithMaximumIncrease = currentStockTicker
+            End If
+            
+            If yearlyPercentChange < maximumYearlyDecrease Then
+                maximumYearlyDecrease = yearlyPercentChange
+                tickerWithMaximumDecrease = currentStockTicker
+            End If
+            
+            If totalVolume > maximumTotalVolume Then
+                maximumTotalVolume = totalVolume
+                tickerWithMaximumVolume = currentStockTicker
+            End If
+            
+            ' POPULATE SUMMARY TABLE AND APPLY FORMATTING
+            currentWorksheet.Range("I" & outputRowIndex).Value = currentStockTicker
+            currentWorksheet.Range("J" & outputRowIndex).Value = yearlyPriceChange
+            currentWorksheet.Range("K" & outputRowIndex).Value = yearlyPercentChange
+            currentWorksheet.Range("K" & outputRowIndex).NumberFormat = "0.00%"
+            currentWorksheet.Range("L" & outputRowIndex).Value = totalVolume
+            
+            ' APPLY COLOR FORMATTING BASED ON YEARLY CHANGE
+            If yearlyPriceChange < 0 Then
+                currentWorksheet.Range("J" & outputRowIndex).Interior.ColorIndex = colorRed
+            Else
+                currentWorksheet.Range("J" & outputRowIndex).Interior.ColorIndex = colorGreen
+            End If
+
+            ' RESET VARIABLES FOR NEXT STOCK TICKER
+            yearlyOpeningPrice = -1
+            totalVolume = 0
+            
+            outputRowIndex = outputRowIndex + 1
+        End If
+    Next rowIndex
+    
+    ' POPULATE TABLE FOR MAXIMUM VALUES
+    currentWorksheet.Range("P1").Value = "Ticker"
+    currentWorksheet.Range("Q1").Value = "Value"
+    currentWorksheet.Range("P1,Q1").Font.Bold = True
+    
+    currentWorksheet.Range("O2").Value = "Greatest % Increase"
+    currentWorksheet.Range("P2").Value = tickerWithMaximumIncrease
+    currentWorksheet.Range("Q2").Value = maximumYearlyIncrease
+    
+    currentWorksheet.Range("O3").Value = "Greatest % Decrease"
+    currentWorksheet.Range("P3").Value = tickerWithMaximumDecrease
+    currentWorksheet.Range("Q3").Value = maximumYearlyDecrease
+    
+    currentWorksheet.Range("O4").Value = "Greatest Total Volume"
+    currentWorksheet.Range("P4").Value = tickerWithMaximumVolume
+    currentWorksheet.Range("Q4").Value = maximumTotalVolume
+    
+    ' FORMAT CELLS IN MAXIMUM VALUES TABLE
+    currentWorksheet.Range("O2:O4").Font.Bold = True
+    currentWorksheet.Range("Q2,Q3").NumberFormat = "0.00%"
+    
+End Sub
